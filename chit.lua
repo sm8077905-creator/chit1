@@ -1,16 +1,14 @@
--- MM2 Ultimate Rage Script (Fully Fixed & Optimized for Delta)
+-- MM2 Ultimate Rage Script (ESP Fixed for Delta)1
 if _G.MM2UltimateRageLoaded then return end
 _G.MM2UltimateRageLoaded = true
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- Конфигурация всех 15 функций
 local Config = {
     RageBot = false,
     SilentAim = false,
@@ -33,7 +31,7 @@ local Config = {
     FOVVal = 90
 }
 
--- Стабильный круговой FOV через Drawing библиотеку Delta
+-- FOV Круг через Drawing
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
 fovCircle.Radius = Config.FovSize
@@ -42,7 +40,24 @@ fovCircle.Thickness = 1
 fovCircle.Filled = false
 fovCircle.Transparency = 0.8
 
--- Создание графического интерфейса
+-- Хранилище для ESP объектов каждого игрока
+local ESPStorage = {}
+
+local function RemoveESP(player)
+    if ESPStorage[player] then
+        for _, obj in pairs(ESPStorage[player]) do
+            pcall(function() obj:Remove() end)
+        end
+        ESPStorage[player] = nil
+    end
+end
+
+for _, p in pairs(Players:GetPlayers()) do
+    p.CharacterRemoving:Connect(function() RemoveESP(p) end)
+end
+Players.PlayerRemoving:Connect(function(p) RemoveESP(p) end)
+
+-- Создание UI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MM2UltimateRage"
 ScreenGui.Parent = game.CoreGui
@@ -69,7 +84,7 @@ Title.BackgroundTransparency = 1
 Title.Position = UDim2.new(0.03, 0, 0, 0)
 Title.Size = UDim2.new(0.8, 0, 1, 0)
 Title.Font = Enum.Font.Code
-Title.Text = "MM2 ULTIMATE RAGE // FIXED"
+Title.Text = "MM2 ULTIMATE RAGE // ESP FIXED"
 Title.TextColor3 = Color3.fromRGB(0, 255, 200)
 Title.TextSize = 13
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -104,7 +119,6 @@ UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 UIList.SortOrder = Enum.SortOrder.LayoutOrder
 UIList.Padding = UDim.new(0, 5)
 
--- Функция создания элементов меню
 local function CreateButton(name, configKey)
     local btn = Instance.new("TextButton")
     btn.Parent = ScrollingFrame
@@ -123,16 +137,18 @@ local function CreateButton(name, configKey)
         else
             btn.Text = name .. ": OFF"
             btn.TextColor3 = Color3.fromRGB(255, 80, 80)
+            if configKey:sub(1,3) == "ESP" or configKey == "Chams" then
+                for _, p in pairs(Players:GetPlayers()) do RemoveESP(p) end
+            end
         end
     end)
 end
 
--- Регистрация всех 15 функций
 CreateButton("1. RageBot (Auto-Lock Murderer)", "RageBot")
 CreateButton("2. Silent Aim (Redirect Gun)", "SilentAim")
 CreateButton("3. Auto-Shoot Gun", "AutoShoot")
 CreateButton("4. FOV Circle Display", "FovCircle")
-CreateButton("5. ESP Box (Models)", "ESPBox")
+CreateButton("5. ESP Box (Drawing)", "ESPBox")
 CreateButton("6. ESP Name Tags", "ESPName")
 CreateButton("7. ESP Health Tracker", "ESPHealth")
 CreateButton("8. ESP Role Highlights", "ESPRole")
@@ -144,7 +160,6 @@ CreateButton("13. FullBright (No Shadows)", "FullBright")
 CreateButton("14. Auto-Farm Coins", "AutoCoin")
 CreateButton("15. Custom FOV Changer", "FOVChanger")
 
--- Поиск актуальной цели (приоритет убийце в поле зрения FOV)
 local function GetTarget()
     local target = nil
     local shortestDist = math.huge
@@ -175,9 +190,8 @@ local function GetTarget()
     return target
 end
 
--- Основной цикл рендеринга для боевых и системных функций
+-- Обработка функционала и рендеринга
 RunService.RenderStepped:Connect(function()
-    -- Обновление круга FOV
     if Config.FovCircle then
         fovCircle.Visible = true
         fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -186,7 +200,6 @@ RunService.RenderStepped:Connect(function()
         fovCircle.Visible = false
     end
 
-    -- 1. RageBot (Плавное наведение на цель)
     if Config.RageBot then
         local target = GetTarget()
         if target then
@@ -194,20 +207,16 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 2. Silent Aim (Редирект луча пистолета)
     if Config.SilentAim and LocalPlayer.Character then
         local gun = LocalPlayer.Character:FindFirstChild("Gun") or LocalPlayer.Backpack:FindFirstChild("Gun")
         if gun and gun:FindFirstChild("Handle") then
             pcall(function()
                 local target = GetTarget()
-                if target then
-                    gun.Handle.CFrame = target.CFrame
-                end
+                if target then gun.Handle.CFrame = target.CFrame end
             end)
         end
     end
 
-    -- 3. Auto-Shoot (Автоматический выстрел при наличии пистолета)
     if Config.AutoShoot and LocalPlayer.Character then
         local gun = LocalPlayer.Character:FindFirstChild("Gun")
         if gun then
@@ -221,29 +230,21 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 10. BunnyHop
     if Config.BunnyHop and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         local hum = LocalPlayer.Character.Humanoid
-        if hum.FloorMaterial ~= Enum.Material.Air then
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
+        if hum.FloorMaterial ~= Enum.Material.Air then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
     end
 
-    -- 11. SpeedHack
     if Config.SpeedHack and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
         LocalPlayer.Character.Humanoid.WalkSpeed = Config.SpeedVal
     end
 
-    -- 12. NoClip
     if Config.NoClip and LocalPlayer.Character then
         for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
+            if part:IsA("BasePart") then part.CanCollide = false end
         end
     end
 
-    -- 13. FullBright
     if Config.FullBright then
         Lighting.Brightness = 2
         Lighting.ClockTime = 14
@@ -251,13 +252,98 @@ RunService.RenderStepped:Connect(function()
         Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
     end
 
-    -- 15. FOV Changer
     if Config.FOVChanger then
         Camera.FieldOfView = Config.FOVVal
     end
+
+    -- Рендеринг ESP (Boxes, Names, Health, Roles, Chams)
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local char = player.Character
+            local hrp = char.HumanoidRootPart
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            
+            if humanoid and humanoid.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                
+                if not ESPStorage[player] then
+                    ESPStorage[player] = {
+                        Box = Drawing.new("Square"),
+                        Name = Drawing.new("Text"),
+                        Health = Drawing.new("Text"),
+                        Highlight = Instance.new("Highlight")
+                    }
+                    ESPStorage[player].Box.Thickness = 1
+                    ESPStorage[player].Box.Filled = false
+                    ESPStorage[player].Name.Size = 14
+                    ESPStorage[player].Name.Center = true
+                    ESPStorage[player].Name.Outline = true
+                    ESPStorage[player].Health.Size = 12
+                    ESPStorage[player].Health.Center = true
+                    ESPStorage[player].Health.Outline = true
+                end
+                
+                local esp = ESPStorage[player]
+                local isMurderer = char:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Knife")
+                local isSheriff = char:FindFirstChild("Gun") or player.Backpack:FindFirstChild("Gun")
+                
+                local roleColor = Color3.fromRGB(0, 255, 100) -- Мирный
+                if isMurderer then roleColor = Color3.fromRGB(255, 0, 0) -- Убийца
+                elseif isSheriff then roleColor = Color3.fromRGB(0, 120, 255) end -- Шериф
+
+                -- ESP Box
+                if onScreen and Config.ESPBox then
+                    local size = Vector2.new(2000 / pos.Z, 3000 / pos.Z)
+                    esp.Box.Size = size
+                    esp.Box.Position = Vector2.new(pos.X - size.X / 2, pos.Y - size.Y / 2)
+                    esp.Box.Color = roleColor
+                    esp.Box.Visible = true
+                else
+                    esp.Box.Visible = false
+                end
+
+                -- ESP Name
+                if onScreen and Config.ESPName then
+                    esp.Name.Text = player.Name
+                    esp.Name.Position = Vector2.new(pos.X, pos.Y - (3000 / pos.Z) / 2 - 18)
+                    esp.Name.Color = roleColor
+                    esp.Name.Visible = true
+                else
+                    esp.Name.Visible = false
+                end
+
+                -- ESP Health
+                if onScreen and Config.ESPHealth then
+                    esp.Health.Text = "HP: " .. math.floor(humanoid.Health)
+                    esp.Health.Position = Vector2.new(pos.X, pos.Y + (3000 / pos.Z) / 2 + 2)
+                    esp.Health.Color = Color3.fromRGB(255, 255, 255)
+                    esp.Health.Visible = true
+                else
+                    esp.Health.Visible = false
+                end
+
+                -- ESP Role / Chams (Highlight)
+                if Config.ESPRole or Config.Chams then
+                    if esp.Highlight.Parent ~= char then
+                        esp.Highlight.Parent = char
+                    end
+                    esp.Highlight.FillColor = roleColor
+                    esp.Highlight.FillTransparency = 0.45
+                    esp.Highlight.OutlineTransparency = 0
+                    esp.Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                else
+                    if esp.Highlight.Parent then esp.Highlight.Parent = nil end
+                end
+            else
+                RemoveESP(player)
+            end
+        else
+            RemoveESP(player)
+        end
+    end
 end)
 
--- 14. Исправленный автофарм монет (глубокое сканирование карты)
+-- Авто-фарм монет
 task.spawn(function()
     while true do
         task.wait(0.2)
@@ -273,44 +359,6 @@ task.spawn(function()
                     end
                 end
             end)
-        end
-    end
-end)
-
--- 8 & 9. Исправленная подсветка ролей и Chams
-RunService.RenderStepped:Connect(function()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local char = player.Character
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            
-            if hrp and humanoid then
-                local highlight = char:FindFirstChild("UltimateHighlight")
-                if Config.ESPRole or Config.Chams then
-                    if not highlight then
-                        highlight = Instance.new("Highlight")
-                        highlight.Name = "UltimateHighlight"
-                        highlight.Parent = char
-                    end
-                    
-                    local isMurderer = char:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Knife")
-                    local isSheriff = char:FindFirstChild("Gun") or player.Backpack:FindFirstChild("Gun")
-                    
-                    if isMurderer then
-                        highlight.FillColor = Color3.fromRGB(255, 0, 0) -- Красный (Убийца)
-                    elseif isSheriff then
-                        highlight.FillColor = Color3.fromRGB(0, 120, 255) -- Синий (Шериф)
-                    else
-                        highlight.FillColor = Color3.fromRGB(0, 255, 100) -- Зеленый (Мирный)
-                    end
-                    highlight.FillTransparency = 0.45
-                    highlight.OutlineTransparency = 0
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                else
-                    if highlight then highlight:Destroy() end
-                end
-            end
         end
     end
 end)
