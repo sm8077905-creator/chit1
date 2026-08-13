@@ -1,7 +1,10 @@
--- Natural Disaster Survival GUI (Fixed for Delta)
+-- Natural Disaster Survival GUI (Delta Optimized + Fly & Knife)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 -- Удаляем старое меню, если оно было
 if PlayerGui:FindFirstChild("NDS_Delta_GUI") then
@@ -18,8 +21,8 @@ local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-MainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
-MainFrame.Size = UDim2.new(0, 220, 0, 300)
+MainFrame.Position = UDim2.new(0.05, 0, 0.15, 0)
+MainFrame.Size = UDim2.new(0, 220, 0, 390) -- Увеличили размер под новые кнопки
 MainFrame.Active = true
 MainFrame.Draggable = true
 
@@ -42,7 +45,7 @@ local TitleCorner = Instance.new("UICorner")
 TitleCorner.CornerRadius = UDim.new(0, 10)
 TitleCorner.Parent = Title
 
--- Функция создания кнопок с фиксированным отступом
+-- Функция создания кнопок с авто-отступом
 local yOffset = 50
 local function createButton(text, callback)
     local btn = Instance.new("TextButton")
@@ -60,7 +63,7 @@ local function createButton(text, callback)
     btnCorner.Parent = btn
     
     btn.MouseButton1Click:Connect(callback)
-    yOffset = yOffset + 43 -- Смещаем следующую кнопку ниже
+    yOffset = yOffset + 43
 end
 
 -- 1. Телепорт к яблокам
@@ -68,7 +71,7 @@ createButton("Телепорт к Яблокам", function()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then return end
     
-    for _, obj in pairs(workspace:GetDescendants()) do
+    for _, obj in pairs(Workspace:GetDescendants()) do
         if obj.Name == "Apple" and obj:IsA("BasePart") then
             char.HumanoidRootPart.CFrame = obj.CFrame + Vector3.new(0, 3, 0)
             break
@@ -76,9 +79,91 @@ createButton("Телепорт к Яблокам", function()
     end
 end)
 
--- 2. Защита от сильного падения
+-- 2. Выдача ножа
+createButton("Выдать Нож", function()
+    -- Ищем нож в игре (в ReplicatedStorage или ServerStorage / Workspace) и клонируем в рюкзак
+    local toolName = "Knife" -- Стандартное имя ножа в NDS
+    local foundTool = nil
+    
+    -- Проверяем ReplicatedStorage
+    local repStorage = game:GetService("ReplicatedStorage")
+    if repStorage:FindFirstChild(toolName, true) then
+        foundTool = repStorage:FindFirstChild(toolName, true):Clone()
+    end
+    
+    -- Если не нашли там, ищем в Workspace или других местах
+    if not foundTool then
+        for _, item in pairs(Workspace:GetDescendants()) do
+            if item.Name == toolName and item:IsA("Tool") then
+                foundTool = item:Clone()
+                break
+            end
+        end
+    end
+    
+    if foundTool and LocalPlayer:FindFirstChild("Backpack") then
+        foundTool.Parent = LocalPlayer.Backpack
+    else
+        -- Запасной вариант: если точное имя отличается, попробуем поискать инструменты в игре
+        for _, item in pairs(repStorage:GetDescendants()) do
+            if item:IsA("Tool") and (item.Name:lower():find("knife") or item.Name:lower():find("нож")) then
+                item:Clone().Parent = LocalPlayer.Backpack
+                break
+            end
+        end
+    end
+end)
+
+-- 3. Функция Полета (Fly)
+local flying = false
+local flySpeed = 50
+createButton("Полет (Вкл/Выкл)", function()
+    flying = not flying
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then return end
+    
+    local rootPart = char.HumanoidRootPart
+    local humanoid = char.Humanoid
+    
+    if flying then
+        humanoid.PlatformStand = true
+        local bg = Instance.new("BodyGyro", rootPart)
+        bg.P = 9e4
+        bg.maxTorque = Vector3.new(9e4, 9e4, 9e4)
+        bg.cframe = rootPart.CFrame
+        
+        local bv = Instance.new("BodyVelocity", rootPart)
+        bv.velocity = Vector3.new(0, 0, 0)
+        bv.maxForce = Vector3.new(9e4, 9e4, 9e4)
+        
+        task.spawn(function()
+            while flying and char and char.Parent do
+                local cam = Workspace.CurrentCamera
+                local moveDir = Vector3.new()
+                
+                -- Управление для мобильных и ПК через камеру
+                moveDir = cam.CFrame.LookVector * (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0) 
+                        - cam.CFrame.LookVector * (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0)
+                
+                -- Для дельта-экзекьютора делаем простой подъем/полет по взгляду камеры
+                bv.velocity = cam.CFrame.LookVector * flySpeed
+                bg.cframe = cam.CFrame
+                RunService.RenderStepped:Wait()
+            end
+            
+            humanoid.PlatformStand = false
+            if bg then bg:Destroy() end
+            if bv then bv:Destroy() end
+        end)
+    else
+        humanoid.PlatformStand = false
+        flying = false
+    end
+end)
+
+-- 4. Защита от сильного падения
 createButton("Анти-урон от падения", function()
-    game:GetService("RunService").Stepped:Connect(function()
+    RunService.Stepped:Connect(function()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             local vel = char.HumanoidRootPart.Velocity
@@ -89,7 +174,7 @@ createButton("Анти-урон от падения", function()
     end)
 end)
 
--- 3. Быстрый бег
+-- 5. Быстрый бег
 local speedEnabled = false
 createButton("Быстрый бег (Вкл/Выкл)", function()
     speedEnabled = not speedEnabled
@@ -99,7 +184,7 @@ createButton("Быстрый бег (Вкл/Выкл)", function()
     end
 end)
 
--- 4. Телепорт на крышу лобби
+-- 6. Телепорт на крышу лобби
 createButton("На крышу (Лобби)", function()
     local char = LocalPlayer.Character
     if char and char:FindFirstChild("HumanoidRootPart") then
@@ -107,9 +192,9 @@ createButton("На крышу (Лобби)", function()
     end
 end)
 
--- 5. Закрыть меню
+-- 7. Закрыть меню
 createButton("Закрыть Меню", function()
     ScreenGui:Destroy()
 end)
 
-print("NDS Menu успешно загружено!")
+print("NDS Menu (Fly & Knife) успешно загружено!")
