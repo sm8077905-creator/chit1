@@ -1,4 +1,4 @@
--- MM2 Ultimate Rage Script with Fly & Full Customization for Delta hamam
+-- MM2 Ultimate Rage Script with Fly & Full Customization for Delta
 if _G.MM2UltimateRageLoaded then return end
 _G.MM2UltimateRageLoaded = true
 
@@ -517,5 +517,3 @@ task.spawn(function()
         end
     end
 end)
-
-```
